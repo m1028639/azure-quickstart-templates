@@ -1,0 +1,865 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters":
+    {
+		"storageAccFE": {
+            "type": "string",
+            "metadata": {
+                "description": "Unique DNS Name for the Storage Account where the Virtual Machine's disks will be placed."
+            }
+        },
+				"storageAccAPP": {
+            "type": "string",
+            "metadata": {
+                "description": "Unique DNS Name for the Storage Account where the Virtual Machine's disks will be placed."
+            }
+        },
+			"storageAccDB": {
+            "type": "string",
+            "metadata": {
+                "description": "Unique DNS Name for the Storage Account where the Virtual Machine's disks will be placed."
+            }
+        },
+       "location": {
+            "type": "string",
+                "metadata": {
+                    "description": "The location where the Virtual Machine will be deployed."
+                },
+                "allowedValues": [
+                    "West US",
+                    "East US",
+                    "Southeast Asia",
+                    "East Asia",
+                    "West Europe"
+                ]
+        },
+        "adminUsername": {
+            "type": "string",
+            "metadata": {
+               "description": "User name for the Virtual Machine."
+            }
+        },
+        "adminPassword": {
+            "type": "securestring",
+            "metadata": {
+                "description": "Password for the Virtual Machine."
+            }
+        },
+        "dnsNameForFE": {
+            "type": "string",
+			"defaultValue":"rentalapp",
+            "metadata": {
+                  "description": "Unique DNS Name for the Public IP used to access the Virtual Machine."
+            }
+        },
+		   "dnsNameForAPP": {
+            "type": "string",
+			"defaultValue":"rentalbusiness",
+            "metadata": {
+                  "description": "Unique DNS Name for the Public IP used to access the Virtual Machine."
+            }
+        },
+		"dnsNameForDB": {
+            "type": "string",
+			"defaultValue":"vehiclerentaldbdns",
+            "metadata": {
+                  "description": "Unique DNS Name for the Public IP used to access the Virtual Machine."
+            }
+        },
+        "ubuntuOSVersion": {
+            "type": "string",
+            "defaultValue": "14.04.2-LTS",
+            "allowedValues": [
+                "12.04.2-LTS",
+                "12.04.3-LTS",
+                "12.04.4-LTS",
+                "12.04.5-LTS",
+		"12.10",
+                "14.04.2-LTS",
+                "14.10",
+                "15.04"
+            ],
+            "metadata": {
+                "description": "The Ubuntu version for the VM. This will pick a fully patched image of this given Ubuntu version. Allowed values: 12.04.2-LTS, 12.04.3-LTS, 12.04.4-LTS, 12.04.5-LTS, 12.10, 14.04.2-LTS, 14.10, 15.04."
+            }
+        },
+        
+
+        "addressPrefix":
+        {
+            "type": "string",
+            "defaultValue": "10.0.0.0/16",
+            "metadata": {
+                "description": "The CIDR address space for your Virtual Network in Azure"
+                 }
+        },
+        "FESubnetPrefix": {
+            "type": "string",
+            "defaultValue": "10.0.0.0/24",
+            "metadata": {
+                "description": "This is CIDR prefix for the FrontEnd Subnet"
+                 }
+        },
+        "AppSubnetPrefix": {
+            "type": "string",
+            "defaultValue": "10.0.1.0/24" ,
+            "metadata": {
+                "description": "This is CIDR prefix for the Application Subnet"
+                 }
+        },
+        "DBSubnetPrefix": {
+            "type": "string",
+            "defaultValue": "10.0.2.0/24",
+            "metadata": {
+                "description": "This is CIDR prefix for the Database Subnet"
+                 }
+        },
+        "FENSGName": {
+            "type": "string",
+            "defaultValue": "FE_NSG",
+            "metadata": {
+                "description": "This is name of the networkSecurityGroup that will be assigned to FrontEnd Subnet"
+                 }
+        },
+        "AppNSGName": {
+            "type": "string",
+            "defaultValue": "App_NSG",
+            "metadata": {
+                "description": "This is name of the networkSecurityGroup that will be assigned to Application Subnet"
+                 }
+        },
+        "DBNSGName": {
+            "type": "string",
+            "defaultValue": "DB_NSG",
+            "metadata": {
+                "description": "This is name of the networkSecurityGroup that will be assigned to Database Subnet"
+                 }
+        }
+		 
+      		
+   },
+   "variables": {
+         "imagePublisher": "Canonical",
+        "imageOffer": "UbuntuServer",
+        "OSDiskName": "osdiskfordockersimple",
+		
+        "nicNameFE": "frontEndVMNic",
+		"nicNameApp": "appVMNic",
+		"dbnicName" : "nicNamedb",
+		
+		"subnetFE": "SubnetFE",
+		"subnetApp": "SubnetAPP",
+		"subnetDB":"SubnetDB",
+		
+        "storageAccountType": "Standard_LRS",
+		
+        "pubIPAddressNameForFE": "pubIPaddressFE",
+		 "pubIPAddressNameForApp": "pubIPaddressApp",
+		 "pubIPAddressNameForDB": "pubIPaddressDB",
+		 
+        "publicIPAddressType": "Dynamic",
+		
+        "vmStorageAccountContainerName": "vhds",
+		
+		"virtualNetworkName": "MyVNET",
+		
+        "vmNameFE": "MyFEVM",
+		 "vmNameApp": "MyAppVM",
+		 "vmNameDB": "MyDBVM",
+		 
+        "vmSize": "Basic_A1",
+		
+		"vnetID": "[resourceId('Microsoft.Network/virtualNetworks',variables('virtualNetworkName'))]",
+		
+        "subnetFERef": "[concat(variables('vnetID'),'/subnets/',variables('subnetFE'))]",
+		 "subnetAppRef": "[concat(variables('vnetID'),'/subnets/',variables('subnetAPP'))]",
+		   "subnetDBRef":"[concat(variables('vnetID'),'/subnets/',variables('subnetDB'))]"
+    },
+
+    "resources":
+    [
+        {
+        "apiVersion": "2015-05-01-preview",
+        "type": "Microsoft.Network/networkSecurityGroups",
+        "name": "[parameters('FENSGName')]",
+        "location": "[parameters('location')]",
+
+        "properties":
+        {
+            "securityRules": [
+         
+            {
+                "name": "web_rule",
+                "properties": {
+                    "description": "Allow WEB",
+                    "protocol": "Tcp",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "80",
+                    "sourceAddressPrefix": "Internet",
+                    "destinationAddressPrefix": "*",
+                    "access": "Allow",
+                    "priority": 101,
+                    "direction": "Inbound"
+                }
+            },
+			{
+                "name": "ssh_rule",
+                "properties": {
+                    "description": "Allow SSH",
+                    "protocol": "Tcp",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "22",
+                    "sourceAddressPrefix": "*",
+                    "destinationAddressPrefix": "*",
+                    "access": "Allow",
+                    "priority": 102,
+                    "direction": "Inbound"
+                }
+            },
+			{
+                "name": "tomcat_rule",
+                "properties": {
+                    "description": "Allow tomcat",
+                    "protocol": "Tcp",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "8080",
+                    "sourceAddressPrefix": "Internet",
+                    "destinationAddressPrefix": "*",
+                    "access": "Allow",
+                    "priority": 103,
+                    "direction": "Inbound"
+                }
+            }
+            ]
+        }
+    },
+    {
+        "apiVersion": "2015-05-01-preview",
+        "type": "Microsoft.Network/networkSecurityGroups",
+        "name": "[parameters('AppNSGName')]",
+        "location": "[parameters('location')]",
+
+        "properties": {
+            "securityRules": [
+			{
+			
+			 "name": "Allow_FEapptomcat",
+                "properties": {
+                    "description": "Allow FE Subnet",
+                    "protocol": "Tcp",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "8080",
+                    "sourceAddressPrefix": "*",
+                    "destinationAddressPrefix": "*",
+                    "access": "Allow",
+                    "priority": 100,
+                    "direction": "Inbound"
+                }
+            },{
+                "name": "Allow_FE",
+                "properties": {
+                    "description": "Allow FE Subnet",
+                    "protocol": "Tcp",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "443",
+                    "sourceAddressPrefix": "10.0.0.0/24",
+                    "destinationAddressPrefix": "*",
+                    "access": "Allow",
+                    "priority": 101,
+                    "direction": "Inbound"
+                }
+            },
+			{
+			 "name": "Allow_FEapp",
+                "properties": {
+                    "description": "Allow FE Subnet",
+                    "protocol": "Tcp",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "80",
+                    "sourceAddressPrefix": "10.0.0.0/24",
+                    "destinationAddressPrefix": "*",
+                    "access": "Allow",
+                    "priority": 102,
+                    "direction": "Inbound"
+                }
+            },
+			{
+			 "name": "Allow_FEapptom",
+                "properties": {
+                    "description": "Allow FE Subnet",
+                    "protocol": "Tcp",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "*",
+                    "sourceAddressPrefix": "10.0.0.0/24",
+                    "destinationAddressPrefix": "*",
+                    "access": "Allow",
+                    "priority": 103,
+                    "direction": "Inbound"
+                }
+            },
+			{
+                "name": "ssh_rule",
+                "properties": {
+                    "description": "Allow SSH",
+                    "protocol": "Tcp",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "22",
+                    "sourceAddressPrefix": "*",
+                    "destinationAddressPrefix": "*",
+                    "access": "Allow",
+                    "priority": 104,
+                    "direction": "Inbound"
+                }
+            },
+			 {
+                "name": "Allow_outdb",
+                "properties": {
+                    "description": "dboutmysql",
+                    "protocol": "tcp",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "3306",
+                    "sourceAddressPrefix": "10.0.1.0/24",
+                    "destinationAddressPrefix": "*",
+                    "access": "Allow",
+                    "priority": 105,
+                    "direction": "Outbound"
+                }
+            }
+            
+            /*{
+                "name": "Block_Internet_Outbound",
+                "properties": {
+                    "description": "Block Internet",
+                    "protocol": "*",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "*",
+                    "sourceAddressPrefix": "*",
+                    "destinationAddressPrefix": "Internet",
+                    "access": "Deny",
+                    "priority": 200,
+                    "direction": "Outbound"
+                }
+                }*/
+				]
+        }
+    },
+    {
+        "apiVersion": "2015-05-01-preview",
+        "type": "Microsoft.Network/networkSecurityGroups",
+        "name": "[parameters('DBNSGName')]",
+        "location": "[parameters('location')]",
+
+        "properties": {
+            "securityRules": [
+			{
+                "name": "Allow_App",
+                "properties": {
+                    "description": "Allow APP Subnet",
+                    "protocol": "Tcp",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "3306",
+                    "sourceAddressPrefix": "10.0.1.0/24",
+                    "destinationAddressPrefix": "*",
+                    "access": "Allow",
+                    "priority": 100,
+                    "direction": "Inbound"
+                }
+            },
+			{
+                "name": "Allow_db",
+                "properties": {
+                    "description": "Allow APP Subnet",
+                    "protocol": "Tcp",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "3306",
+                    "sourceAddressPrefix": "*",
+                    "destinationAddressPrefix": "*",
+                    "access": "Allow",
+                    "priority": 101,
+                    "direction": "Inbound"
+                }
+            },
+			{
+                "name": "ssh_rule",
+                "properties": {
+                    "description": "Allow SSH",
+                    "protocol": "Tcp",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "22",
+                    "sourceAddressPrefix": "*",
+                    "destinationAddressPrefix": "*",
+                    "access": "Allow",
+                    "priority": 102,
+                    "direction": "Inbound"
+                }
+            },
+			{
+                "name": "tomcat_rule",
+                "properties": {
+                    "description": "Allow tomcat",
+                    "protocol": "Tcp",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "8080",
+                    "sourceAddressPrefix": "*",
+                    "destinationAddressPrefix": "*",
+                    "access": "Allow",
+                    "priority": 103,
+                    "direction": "Inbound"
+                }
+            }
+            /*{
+                "name": "Block_FE",
+                "properties": {
+                    "description": "Block FE Subnet",
+                    "protocol": "*",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "*",
+                    "sourceAddressPrefix": "10.0.0.0/24",
+                    "destinationAddressPrefix": "*",
+                    "access": "Deny",
+                    "priority": 103,
+                    "direction": "Inbound"
+                }
+            },*/
+           /* {
+                "name": "Block_App",
+                "properties": {
+                    "description": "Block App Subnet",
+                    "protocol": "*",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "*",
+                    "sourceAddressPrefix": "10.0.1.0/24",
+                    "destinationAddressPrefix": "*",
+                    "access": "Deny",
+                    "priority": 104,
+                    "direction": "Inbound"
+                }
+            },*/
+            /*{
+                "name": "Block_Internet",
+                "properties": {
+                    "description": "Block Internet",
+                    "protocol": "*",
+                    "sourcePortRange": "*",
+                    "destinationPortRange": "*",
+                    "sourceAddressPrefix": "*",
+                    "destinationAddressPrefix": "Internet",
+                    "access": "Deny",
+                    "priority": 200,
+                    "direction": "Outbound"
+                }
+                }*/]
+        }
+    },
+	
+	  {
+            "type": "Microsoft.Storage/storageAccounts",
+            "name": "[parameters('storageAccFE')]",
+            "apiVersion": "2015-05-01-preview",
+            "location": "[parameters('location')]",
+            "properties": {
+                "accountType": "[variables('storageAccountType')]"
+            }
+        },
+		{
+            "type": "Microsoft.Storage/storageAccounts",
+            "name": "[parameters('storageAccApp')]",
+            "apiVersion": "2015-05-01-preview",
+            "location": "[parameters('location')]",
+            "properties": {
+                "accountType": "[variables('storageAccountType')]"
+            }
+        },
+		
+		{
+            "type": "Microsoft.Storage/storageAccounts",
+            "name": "[parameters('storageAccDB')]",
+            "apiVersion": "2015-05-01-preview",
+            "location": "[parameters('location')]",
+            "properties": {
+                "accountType": "[variables('storageAccountType')]"
+            }
+        },
+       {
+            "apiVersion": "2015-05-01-preview",
+            "type": "Microsoft.Network/publicIPAddresses",
+            "name": "[variables('pubIPAddressNameForFE')]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "publicIPAllocationMethod": "[variables('publicIPAddressType')]",
+                "dnsSettings": {
+                    "domainNameLabel": "[parameters('dnsNameForFE')]"
+                }
+            }
+        },
+		{
+            "apiVersion": "2015-05-01-preview",
+            "type": "Microsoft.Network/publicIPAddresses",
+            "name": "[variables('pubIPAddressNameForApp')]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "publicIPAllocationMethod": "[variables('publicIPAddressType')]",
+                "dnsSettings": {
+                    "domainNameLabel": "[parameters('dnsNameForAPP')]"
+                }
+            }
+        },
+		
+		{
+        "apiVersion": "2015-05-01-preview",
+        "type": "Microsoft.Network/publicIPAddresses",
+        "name": "[variables('pubIPAddressNameForDB')]",
+        "location": "[parameters('location')]",
+        "properties": {
+            "publicIPAllocationMethod": "[variables('publicIPAddressType')]",
+            "dnsSettings": {
+                "domainNameLabel": "[parameters('dnsNameForDB')]"
+            }
+        }
+    },
+    
+	
+    {
+        "apiVersion": "2015-05-01-preview",
+        "type": "Microsoft.Network/virtualNetworks",
+        "name": "[variables('virtualNetworkName')]",
+        "location": "[parameters('location')]",
+        "dependsOn": [
+            "[concat('Microsoft.Network/networkSecurityGroups/', parameters('FENSGName'))]",
+            "[concat('Microsoft.Network/networkSecurityGroups/', parameters('AppNSGName'))]",
+            "[concat('Microsoft.Network/networkSecurityGroups/', parameters('DBNSGName'))]"
+        ],
+        "properties": {
+            "addressSpace": {
+                "addressPrefixes": [
+                    "[parameters('addressPrefix')]"
+                ]
+            },
+            "subnets":
+            [{
+                "name": "[variables('subnetFE')]",
+                "properties": {
+                    "addressPrefix": "[parameters('FESubnetPrefix')]",
+                    "networkSecurityGroup" : {
+                      "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('FENSGName'))]"
+                      }
+                }
+             },
+             {
+                "name": "[variables('subnetApp')]",
+                "properties": {
+                    "addressPrefix": "[parameters('AppSubnetPrefix')]",
+                 "networkSecurityGroup" : {
+                      "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('AppNSGName'))]"
+                }
+                }
+            },
+            {
+                "name": "[variables('subnetDB')]",
+                "properties": {
+                    "addressPrefix": "[parameters('DBSubnetPrefix')]",
+                    "networkSecurityGroup" : {
+                      "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('DBNSGName'))]"
+                      }
+                }
+            }
+            ]
+        }
+    },
+	
+	        {
+            "apiVersion": "2015-05-01-preview",
+            "type": "Microsoft.Network/networkInterfaces",
+            "name": "[variables('nicNameFE')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/publicIPAddresses/', variables('pubIPAddressNameForFE'))]",
+                "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses',variables('pubIPAddressNameForFE'))]"
+                            },
+                            "subnet": {
+                                "id": "[variables('subnetFERef')]"
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+		
+		  {
+            "apiVersion": "2015-05-01-preview",
+            "type": "Microsoft.Network/networkInterfaces",
+            "name": "[variables('nicNameApp')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+			
+                "[concat('Microsoft.Network/publicIPAddresses/', variables('pubIPAddressNameForApp'))]",
+                "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses',variables('pubIPAddressNameForApp'))]"
+                            },
+                            "subnet": {
+                                "id": "[variables('subnetAppRef')]"
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+		
+		{
+        "apiVersion": "2015-05-01-preview",
+        "type": "Microsoft.Network/networkInterfaces",
+        "name": "[variables('dbnicName')]",
+        "location": "[parameters('location')]",
+        "dependsOn": [
+            "[concat('Microsoft.Network/publicIPAddresses/', variables('pubIPAddressNameForDB'))]",
+            "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]"
+        ],
+        "properties": {
+            "ipConfigurations": [
+            {
+                "name": "ipconfig1",
+                "properties": {
+                    "privateIPAllocationMethod": "Dynamic",
+                    "publicIPAddress": {
+                        "id": "[resourceId('Microsoft.Network/publicIPAddresses',variables('pubIPAddressNameForDB'))]"
+                    },
+                    "subnet": {
+                        "id": "[variables('subnetDBRef')]"
+                    }
+                }
+            }
+            ]
+        }
+    },
+	 
+		
+		 
+	
+    {
+            "apiVersion": "2015-05-01-preview",
+            "type": "Microsoft.Compute/virtualMachines",
+            "name": "[variables('vmNameDB')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Storage/storageAccounts/', parameters('storageAccDB'))]",
+                "[concat('Microsoft.Network/networkInterfaces/', variables('dbnicName'))]"
+            ],
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "[variables('vmSize')]"
+                },
+                "osProfile": {
+                    "computername": "[variables('vmNameDB')]",
+                    "adminUsername": "[parameters('adminUsername')]",
+                    "adminPassword": "[parameters('adminPassword')]"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "[variables('imagePublisher')]",
+                        "offer": "[variables('imageOffer')]",
+                        "sku" : "[parameters('ubuntuOSVersion')]",
+                        "version":"latest"
+                    },
+                   "osDisk" : {
+                        "name": "osdisk1",
+                        "vhd": {
+                            "uri": "[concat('http://',parameters('storageAccDB'),'.blob.core.windows.net/',variables('vmStorageAccountContainerName'),'/',variables('OSDiskName'),'.vhd')]"
+                        },
+                        "caching": "ReadWrite",
+                        "createOption": "FromImage"
+                    }
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('dbnicName'))]"
+                        }
+                    ]
+                }
+            }
+        },
+		{
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "name": "[concat(variables('vmNameDB'),'/dbscript')]",
+            "apiVersion": "2015-05-01-preview",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+				"[concat('Microsoft.Compute/virtualMachines/', variables('vmNameDB'))]"
+			
+            ],
+            "properties": {
+                "publisher": "Microsoft.OSTCExtensions",
+                "type": "CustomScriptForLinux",
+                "typeHandlerVersion": "1.2",
+                "settings": {
+                    "fileUris": [
+                      	"https://raw.githubusercontent.com/PreetiCK/scripts/master/install_mysql.sh?_sm_au_=injcfb76qVrRDZ6P"
+                    ],
+                    "commandToExecute": "sh install_mysql.sh"
+                }
+            }
+        },
+		
+		{
+            "apiVersion": "2015-05-01-preview",
+            "type": "Microsoft.Compute/virtualMachines",
+            "name": "[variables('vmNameApp')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Storage/storageAccounts/', parameters('storageAccApp'))]",
+                "[concat('Microsoft.Network/networkInterfaces/', variables('nicNameApp'))]"
+					/*"[concat('Microsoft.Compute/virtualMachines/', variables('vmNameDB'))]"
+					"[concat('Mirosoft.Compute/virtualMachines/extensions/',variables('vmNameDB'),'/dbscript')]"*/
+            ],
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "[variables('vmSize')]"
+                },
+                "osProfile": {
+                    "computername": "[variables('vmNameApp')]",
+                    "adminUsername": "[parameters('adminUsername')]",
+                    "adminPassword": "[parameters('adminPassword')]"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "[variables('imagePublisher')]",
+                        "offer": "[variables('imageOffer')]",
+                        "sku" : "[parameters('ubuntuOSVersion')]",
+                        "version":"latest"
+                    },
+                   "osDisk" : {
+                        "name": "osdisk1",
+                        "vhd": {
+                            "uri": "[concat('http://',parameters('storageAccApp'),'.blob.core.windows.net/',variables('vmStorageAccountContainerName'),'/',variables('OSDiskName'),'.vhd')]"
+                        },
+                        "caching": "ReadWrite",
+                        "createOption": "FromImage"
+                    }
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('nicNameApp'))]"
+                        }
+                    ]
+                }
+            }
+        },
+			{
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "name": "[concat(variables('vmNameApp'),'/appscript')]",
+            "apiVersion": "2015-05-01-preview",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+				"[concat('Microsoft.Compute/virtualMachines/', variables('vmNameDB'))]",
+                "[concat('Microsoft.Compute/virtualMachines/', variables('vmNameApp'))]"
+				
+            ],
+            "properties": {
+                "publisher": "Microsoft.OSTCExtensions",
+                "type": "CustomScriptForLinux",
+                "typeHandlerVersion": "1.2",
+                "settings": {
+                    "fileUris": [
+                        "https://raw.githubusercontent.com/PreetiCK/scripts/master/business_conf.sh?_sm_au_=iJj5j7Sqk2vVNpJV"
+                    ],
+                    "commandToExecute": "sh business_conf.sh"
+                }
+            }
+        },
+		
+		{
+            "apiVersion": "2015-05-01-preview",
+            "type": "Microsoft.Compute/virtualMachines",
+            "name": "[variables('vmNameFE')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Storage/storageAccounts/', parameters('storageAccFE'))]",
+                "[concat('Microsoft.Network/networkInterfaces/', variables('nicNameFE'))]"
+				/*"[concat('Microsoft.Compute/virtualMachines/', variables('vmNameDB'))]",
+				"[concat('Microsoft.Compute/virtualMachines/', variables('vmNameApp'))]"
+				"[concat('Mirosoft.Compute/virtualMachines/extensions/',variables('vmNameApp'),'/appscript')]",
+				"[concat('Mirosoft.Compute/virtualMachines/extensions/',variables('vmNameDB'),'/dbscript')]" */
+            ],
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "[variables('vmSize')]"
+                },
+                "osProfile": {
+                    "computername": "[variables('vmNameFE')]",
+                    "adminUsername": "[parameters('adminUsername')]",
+                    "adminPassword": "[parameters('adminPassword')]"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "[variables('imagePublisher')]",
+                        "offer": "[variables('imageOffer')]",
+                        "sku" : "[parameters('ubuntuOSVersion')]",
+                        "version":"latest"
+                    },
+                   "osDisk" : {
+                        "name": "osdisk1",
+                        "vhd": {
+                            "uri": "[concat('http://',parameters('storageAccFE'),'.blob.core.windows.net/',variables('vmStorageAccountContainerName'),'/',variables('OSDiskName'),'.vhd')]"
+                        },
+                        "caching": "ReadWrite",
+                        "createOption": "FromImage"
+                    }
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('nicNameFE'))]"
+                        }
+                    ]
+                }
+            }
+        },
+		
+		
+		
+
+			{
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "name": "[concat(variables('vmNameFE'),'/fescript')]",
+            "apiVersion": "2015-05-01-preview",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+				"[concat('Microsoft.Compute/virtualMachines/', variables('vmNameDB'))]",
+				 "[concat('Microsoft.Compute/virtualMachines/', variables('vmNameApp'))]",
+                "[concat('Microsoft.Compute/virtualMachines/', variables('vmNameFE'))]"
+				
+            ],
+            "properties": {
+                "publisher": "Microsoft.OSTCExtensions",
+                "type": "CustomScriptForLinux",
+                "typeHandlerVersion": "1.2",
+                "settings": {
+                    "fileUris": [
+                   
+						"https://raw.githubusercontent.com/PreetiCK/scripts/master/presentation_conf.sh?_sm_au_=inj3jZZW3TWTVvsH"
+                    ],
+                    "commandToExecute": "sh presentation_conf.sh"
+                }
+            }
+        }
+    ]
+}
