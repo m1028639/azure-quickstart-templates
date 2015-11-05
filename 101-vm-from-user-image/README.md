@@ -21,3 +21,7 @@ Below are the parameters that the template expects
 | dnsNameForPublicIP  | Unique DNS Name for the Public IP used to access the Virtual Machine. |
 | vmSize | Size of the Virtual Machine |
 | 
+
+
+
+[![Deploy to Azure](http://azuredeploy.net/deploybutton.png)](https://azuredeploy.net/)
