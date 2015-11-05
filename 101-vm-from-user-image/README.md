@@ -62,3 +62,7 @@ If you are looking to accomplish the above scenario through PowerShell instead o
 
     ## Create the VM in Azure
     New-AzureVM -ResourceGroupName $rgName -Location $location -VM $vm -Verbose
+    
+    
+[![Deploy to Azure](http://azuredeploy.net/deploybutton.png)](https://azuredeploy.net/)
+
